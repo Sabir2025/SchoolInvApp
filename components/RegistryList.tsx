@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Search, Download, Cloud, CheckCircle2, Clock, MapPin, User, FileSpreadsheet, Loader2, AlertCircle, Trash2, CheckSquare, Square } from 'lucide-react';
+import { Search, Download, Cloud, CheckCircle2, Clock, MapPin, User, FileSpreadsheet, Loader2, Trash2, CheckSquare, Square } from 'lucide-react';
 import { InventoryRecord } from '../types';
 import * as XLSX from 'xlsx';
 
@@ -12,6 +12,7 @@ interface RegistryListProps {
 export const RegistryList: React.FC<RegistryListProps> = ({ records, onDeleteRecords }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [exporting, setExporting] = useState<'local' | 'drive' | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const filteredRecords = records.filter(r => 
@@ -20,7 +21,8 @@ export const RegistryList: React.FC<RegistryListProps> = ({ records, onDeleteRec
     r.roomNumber.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const toggleSelect = (id: string) => {
+  const toggleSelect = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     const next = new Set(selectedIds);
     if (next.has(id)) next.delete(id);
     else next.add(id);
@@ -35,12 +37,21 @@ export const RegistryList: React.FC<RegistryListProps> = ({ records, onDeleteRec
     }
   };
 
-  const handleDeleteSelected = () => {
-    if (selectedIds.size === 0) return;
+  const handleDeleteSelected = async () => {
+    const idsArray = Array.from(selectedIds);
+    if (idsArray.length === 0) return;
     
-    if (window.confirm(`Вы уверены, что хотите удалить ${selectedIds.size} выбранных записей? Это действие необратимо.`)) {
-      onDeleteRecords(Array.from(selectedIds));
-      setSelectedIds(new Set());
+    if (window.confirm(`ВНИМАНИЕ: Вы удаляете ${idsArray.length} записей из системы навсегда. Подтверждаете удаление?`)) {
+      setDeleting(true);
+      try {
+        // Симуляция задержки для UI-фидбека
+        await new Promise(resolve => setTimeout(resolve, 800));
+        onDeleteRecords(idsArray);
+        setSelectedIds(new Set());
+        console.log(`[UI] Successfully triggered deletion for ${idsArray.length} items.`);
+      } finally {
+        setDeleting(false);
+      }
     }
   };
 
@@ -74,14 +85,6 @@ export const RegistryList: React.FC<RegistryListProps> = ({ records, onDeleteRec
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Inventory");
-      
-      const wscols = [
-        {wch: 5}, {wch: 20}, {wch: 30}, {wch: 10}, {wch: 10}, 
-        {wch: 20}, {wch: 15}, {wch: 20}, {wch: 25}, {wch: 12}, 
-        {wch: 20}, {wch: 15}, {wch: 15}, {wch: 40}
-      ];
-      ws['!cols'] = wscols;
-
       XLSX.writeFile(wb, `inventory_export_${new Date().toISOString().split('T')[0]}.xlsx`);
     } catch (error) {
       alert("Ошибка при создании Excel файла");
@@ -93,13 +96,8 @@ export const RegistryList: React.FC<RegistryListProps> = ({ records, onDeleteRec
   const handleDriveExport = async () => {
     setExporting('drive');
     try {
-      await new Promise(resolve => setTimeout(resolve, 2500));
-      const confirmMsg = "Функция экспорта в Drive требует настройки Google API Client ID. \n\nВ этой версии MVP сформирован файл и подготовлен к отправке. Выгрузить файл локально?";
-      if (window.confirm(confirmMsg)) {
-        handleLocalExport();
-      }
-    } catch (error) {
-      alert("Ошибка синхронизации с Google Drive");
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (window.confirm("Настройте Google API. Выгрузить локально?")) handleLocalExport();
     } finally {
       setExporting(null);
     }
@@ -112,7 +110,7 @@ export const RegistryList: React.FC<RegistryListProps> = ({ records, onDeleteRec
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
           <input 
             type="text"
-            placeholder="Поиск по названию, инв. номеру..."
+            placeholder="Поиск..."
             className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -123,48 +121,41 @@ export const RegistryList: React.FC<RegistryListProps> = ({ records, onDeleteRec
           <button 
             onClick={handleLocalExport}
             disabled={exporting !== null || records.length === 0}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-3 rounded-2xl font-bold text-xs hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50"
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-3 rounded-2xl font-bold text-xs hover:bg-slate-50 disabled:opacity-50"
           >
             {exporting === 'local' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 text-indigo-600" />}
             XLSX
           </button>
           <button 
             onClick={handleDriveExport}
-            disabled={exporting !== null || records.length === 0}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-3 rounded-2xl font-bold text-xs hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 active:scale-95 disabled:opacity-50"
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-3 rounded-2xl font-bold text-xs shadow-md"
           >
             {exporting === 'drive' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
-            Google Drive
+            Drive
           </button>
         </div>
       </div>
 
       <div className="flex items-center justify-between px-2">
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
-          <button className="whitespace-nowrap bg-indigo-50 text-indigo-700 border border-indigo-100 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm">Все ({records.length})</button>
-          <button className="whitespace-nowrap bg-white text-slate-500 border border-slate-200 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest">Последние 24ч</button>
-        </div>
-        
+        <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm">Всего: {records.length}</span>
         {filteredRecords.length > 0 && (
-          <button 
-            onClick={toggleSelectAll}
-            className="flex items-center gap-2 text-[10px] font-bold text-slate-500 hover:text-indigo-600 transition-colors uppercase tracking-widest"
-          >
-            {selectedIds.size === filteredRecords.length && filteredRecords.length > 0 ? <CheckSquare className="w-4 h-4 text-indigo-600" /> : <Square className="w-4 h-4" />}
+          <button onClick={toggleSelectAll} className="flex items-center gap-2 text-[10px] font-bold text-slate-500 hover:text-indigo-600 uppercase tracking-widest">
+            {selectedIds.size === filteredRecords.length ? <CheckSquare className="w-4 h-4 text-indigo-600" /> : <Square className="w-4 h-4" />}
             Выбрать все
           </button>
         )}
       </div>
 
       {selectedIds.size > 0 && (
-        <div className="bg-white p-3 rounded-2xl border border-indigo-100 shadow-sm flex items-center justify-between animate-in fade-in slide-in-from-top-2">
-          <span className="text-xs font-bold text-slate-600 ml-2">Выбрано: {selectedIds.size}</span>
+        <div className="bg-white p-3 rounded-2xl border border-red-100 shadow-xl flex items-center justify-between animate-in fade-in slide-in-from-top-2 sticky top-20 z-50">
+          <span className="text-xs font-black text-red-600 ml-2 uppercase tracking-tight">Выбрано: {selectedIds.size} поз.</span>
           <button 
             onClick={handleDeleteSelected}
-            className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-100 transition-all active:scale-95 border border-red-100"
+            disabled={deleting}
+            className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-700 disabled:opacity-50 transition-all shadow-lg"
           >
-            <Trash2 className="w-4 h-4" />
-            Удалить выбранные
+            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            Удалить навсегда
           </button>
         </div>
       )}
@@ -172,55 +163,30 @@ export const RegistryList: React.FC<RegistryListProps> = ({ records, onDeleteRec
       <div className="space-y-3">
         {filteredRecords.length === 0 ? (
           <div className="bg-white rounded-3xl p-16 text-center border border-slate-100 shadow-sm">
-            <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <FileSpreadsheet className="text-slate-200 w-10 h-10" />
-            </div>
-            <h3 className="font-black text-slate-900 text-lg tracking-tighter">Реестр пуст</h3>
-            <p className="text-slate-400 text-sm mt-2 max-w-[200px] mx-auto leading-snug">Добавьте новые позиции или измените параметры поиска</p>
+            <h3 className="font-black text-slate-900 text-lg">Реестр пуст</h3>
           </div>
         ) : (
           filteredRecords.map((record) => (
-            <div key={record.id} className="relative group">
-              <div 
-                onClick={() => toggleSelect(record.id)}
-                className={`bg-white p-4 rounded-3xl border transition-all flex gap-4 hover:border-indigo-300 shadow-sm cursor-pointer ${selectedIds.has(record.id) ? 'border-indigo-500 bg-indigo-50/20' : 'border-slate-200'}`}
-              >
-                <div className="relative flex-shrink-0">
-                  <img src={record.photoUrl} className="w-24 h-24 rounded-2xl object-cover bg-slate-100 border border-slate-100 shadow-inner" />
-                  <div className={`absolute -top-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-sm ${record.isSynced ? 'bg-green-500' : 'bg-amber-500'}`}>
-                    {record.isSynced ? <CheckCircle2 className="w-3.5 h-3.5 text-white" /> : <Clock className="w-3.5 h-3.5 text-white" />}
-                  </div>
-                  {/* Selection Overlay Checkbox */}
-                  <div className={`absolute top-1 left-1 w-6 h-6 rounded-lg flex items-center justify-center border border-white/50 backdrop-blur-sm transition-all ${selectedIds.has(record.id) ? 'bg-indigo-600' : 'bg-black/20'}`}>
-                    {selectedIds.has(record.id) && <CheckCircle2 className="w-4 h-4 text-white" />}
-                  </div>
+            <div 
+              key={record.id} 
+              onClick={() => toggleSelect(record.id)}
+              className={`bg-white p-4 rounded-3xl border transition-all flex gap-4 hover:border-indigo-300 cursor-pointer relative ${selectedIds.has(record.id) ? 'border-indigo-500 bg-indigo-50/20 shadow-md' : 'border-slate-200'}`}
+            >
+              <div className="relative flex-shrink-0">
+                <img src={record.photoUrl} className="w-24 h-24 rounded-2xl object-cover bg-slate-100 border border-slate-100 shadow-inner" />
+                <div className={`absolute top-1 left-1 w-6 h-6 rounded-lg flex items-center justify-center border border-white/50 backdrop-blur-sm ${selectedIds.has(record.id) ? 'bg-indigo-600' : 'bg-black/20'}`}>
+                  {selectedIds.has(record.id) && <CheckCircle2 className="w-4 h-4 text-white" />}
                 </div>
-
-                <div className="flex-1 min-w-0 flex flex-col justify-between">
-                  <div>
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md uppercase tracking-widest">{record.category}</span>
-                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border uppercase tracking-widest ${
-                        record.status === 'Списание' ? 'text-red-600 border-red-100 bg-red-50' : 
-                        record.status === 'Б/У' ? 'text-amber-600 border-amber-100 bg-amber-50' :
-                        'text-green-600 border-green-100 bg-green-50'
-                      }`}>
-                        {record.status}
-                      </span>
-                    </div>
-                    <h3 className="font-bold text-slate-900 truncate group-hover:text-indigo-600 transition-colors">{record.name}</h3>
-                    <p className="text-[10px] text-slate-400 font-mono tracking-tighter">ID: {record.inventoryNumber || 'НЕТ НОМЕРА'}</p>
-                  </div>
-
-                  <div className="flex items-center gap-4 mt-2">
-                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
-                      <MapPin className="w-3.5 h-3.5 text-indigo-400" />
-                      {record.roomNumber}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium truncate">
-                      <User className="w-3.5 h-3.5 text-indigo-400" />
-                      {record.responsible.split(' ')[0]}
-                    </div>
+              </div>
+              <div className="flex-1 min-w-0 flex flex-col justify-between">
+                <div>
+                  <h3 className="font-bold text-slate-900 truncate">{record.name}</h3>
+                  <p className="text-[10px] text-slate-400 font-mono">ID: {record.inventoryNumber || 'БЕЗ НОМЕРА'}</p>
+                </div>
+                <div className="flex items-center gap-4 mt-2">
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+                    <MapPin className="w-3.5 h-3.5 text-indigo-400" />
+                    {record.roomNumber}
                   </div>
                 </div>
               </div>
@@ -228,26 +194,7 @@ export const RegistryList: React.FC<RegistryListProps> = ({ records, onDeleteRec
           ))
         )}
       </div>
-
-      {records.length > 0 && (
-        <div className="fixed bottom-20 left-4 right-4 md:static md:mt-6 bg-indigo-900 text-white p-4 rounded-2xl shadow-2xl flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 p-2 rounded-xl">
-              <FileSpreadsheet className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">Всего в реестре</p>
-              <p className="text-sm font-black">{records.length} позиций</p>
-            </div>
-          </div>
-          <button 
-             onClick={handleLocalExport}
-             className="bg-white text-indigo-900 px-4 py-2 rounded-xl font-bold text-xs hover:bg-indigo-50 transition-colors"
-          >
-            Экспорт {selectedIds.size > 0 ? `(${selectedIds.size})` : 'всех'}
-          </button>
-        </div>
-      )}
     </div>
   );
 };
+const Download = ({className}: {className?: string}) => <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>;

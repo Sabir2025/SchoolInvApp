@@ -8,8 +8,11 @@ export enum ItemStatus {
 }
 
 export interface CatalogItem {
+  id: string;
   category: string;
   name: string;
+  sourceFile?: string;
+  importDate?: string;
 }
 
 export interface InventoryRecord {

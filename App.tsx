@@ -47,7 +47,6 @@ const App: React.FC = () => {
     setUser(updatedUser);
     localStorage.setItem('inventory_user', JSON.stringify(updatedUser));
     
-    // Update in "database"
     const allUsers = JSON.parse(localStorage.getItem('all_users') || '[]');
     const userIndex = allUsers.findIndex((u: User) => u.email === updatedUser.email);
     if (userIndex !== -1) {
@@ -63,9 +62,11 @@ const App: React.FC = () => {
   };
 
   const addRecord = (record: InventoryRecord) => {
-    const updatedRecords = [record, ...records];
-    setRecords(updatedRecords);
-    localStorage.setItem('inventory_records', JSON.stringify(updatedRecords));
+    setRecords(prev => {
+      const next = [record, ...prev];
+      localStorage.setItem('inventory_records', JSON.stringify(next));
+      return next;
+    });
     
     setTimeout(() => {
       setRecords(prev => prev.map(r => r.id === record.id ? { ...r, isSynced: true } : r));
@@ -75,15 +76,28 @@ const App: React.FC = () => {
   };
 
   const deleteRecords = (ids: string[]) => {
-    const updatedRecords = records.filter(r => !ids.includes(r.id));
-    setRecords(updatedRecords);
-    localStorage.setItem('inventory_records', JSON.stringify(updatedRecords));
+    if (!user) return;
+    setRecords(prev => {
+      const next = prev.filter(r => !ids.includes(r.id));
+      localStorage.setItem('inventory_records', JSON.stringify(next));
+      console.log(`[STORAGE] Deleted ${ids.length} records. Sync successful.`);
+      return next;
+    });
   };
 
-  const deleteCatalogItems = (indices: number[]) => {
-    const updatedCatalog = catalog.filter((_, index) => !indices.includes(index));
-    setCatalog(updatedCatalog);
-    localStorage.setItem('inventory_catalog', JSON.stringify(updatedCatalog));
+  const updateCatalog = (items: CatalogItem[]) => {
+    setCatalog(items);
+    localStorage.setItem('inventory_catalog', JSON.stringify(items));
+  };
+
+  const deleteCatalogItems = (ids: string[]) => {
+    if (!user) return;
+    setCatalog(prev => {
+      const next = prev.filter(item => !ids.includes(item.id));
+      localStorage.setItem('inventory_catalog', JSON.stringify(next));
+      console.log(`[STORAGE] Deleted ${ids.length} nomenclature items. Sync successful.`);
+      return next;
+    });
   };
 
   if (!user || !user.isVerified) {
@@ -103,10 +117,7 @@ const App: React.FC = () => {
       case 'import':
         return <NomenclatureImport 
                   catalog={catalog} 
-                  setCatalog={(c) => {
-                    setCatalog(c);
-                    localStorage.setItem('inventory_catalog', JSON.stringify(c));
-                  }} 
+                  setCatalog={updateCatalog} 
                   onDeleteItems={deleteCatalogItems}
                 />;
       case 'add':
