@@ -1,0 +1,7 @@
+{
+  "name": "School Inventory Pro MVP",
+  "description": "A professional inventory management system for schools with Google Drive/Sheets integration, offline-first capabilities, and AI-assisted photo analysis.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
