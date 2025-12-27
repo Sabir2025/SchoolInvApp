@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Upload, FileText, Database, Trash2, CheckCircle2, Loader2, XCircle, CheckSquare, Square, FileStack } from 'lucide-react';
+import { Upload, FileText, Database, Trash2, CheckCircle2, Loader2, XCircle, CheckSquare, Square, FileStack, X } from 'lucide-react';
 import { CatalogItem } from '../types';
 import * as XLSX from 'xlsx';
 
@@ -62,6 +62,7 @@ export const NomenclatureImport: React.FC<NomenclatureImportProps> = ({ catalog,
         }
       } finally {
         setProcessing(false);
+        if (e.target) e.target.value = '';
       }
     };
     reader.readAsArrayBuffer(file);
@@ -79,6 +80,11 @@ export const NomenclatureImport: React.FC<NomenclatureImportProps> = ({ catalog,
     if (next.has(fileName)) next.delete(fileName);
     else next.add(fileName);
     setSelectedFileNames(next);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedItemIds(new Set());
+    setSelectedFileNames(new Set());
   };
 
   const handleDeleteItems = async () => {
@@ -109,40 +115,85 @@ export const NomenclatureImport: React.FC<NomenclatureImportProps> = ({ catalog,
     }
   };
 
+  const hasSelection = selectedItemIds.size > 0 || selectedFileNames.size > 0;
+
   return (
     <div className="space-y-6 pb-12">
       <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
           <Database className="w-5 h-5 text-indigo-600" />
-          <h2 className="text-lg font-bold">Загрузка данных</h2>
+          <h2 className="text-lg font-bold text-slate-900">Загрузка данных</h2>
         </div>
-        <div className="border-2 border-dashed rounded-xl p-8 text-center transition-all border-slate-200">
+        <div className="border-2 border-dashed rounded-xl p-8 text-center transition-all border-slate-200 hover:border-indigo-300 bg-slate-50/30">
           <Upload className={`w-12 h-12 mx-auto mb-3 ${processing ? 'text-indigo-400 animate-bounce' : 'text-slate-300'}`} />
           <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" id="file-upload" disabled={processing} />
-          <label htmlFor="file-upload" className="inline-flex items-center gap-2 bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold cursor-pointer hover:bg-indigo-700 shadow-md">
+          <label htmlFor="file-upload" className="inline-flex items-center gap-2 bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold cursor-pointer hover:bg-indigo-700 shadow-md transition-all active:scale-95">
             {processing ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileText className="w-5 h-5" />}
             Выбрать файл (.xlsx)
           </label>
         </div>
-        {lastImportCount && <div className="mt-4 text-green-600 text-sm font-bold flex items-center gap-2"><CheckCircle2 className="w-4 h-4"/> Успешно загружено {lastImportCount} поз.</div>}
+        {lastImportCount && (
+          <div className="mt-4 p-3 bg-green-50 border border-green-100 rounded-xl text-green-700 text-sm font-bold flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+            <CheckCircle2 className="w-4 h-4"/> 
+            Успешно загружено {lastImportCount} поз.
+          </div>
+        )}
       </section>
 
+      {hasSelection && (
+        <div className="sticky top-20 z-50 animate-in fade-in slide-in-from-top-2">
+          <div className="bg-indigo-900 text-white p-3 rounded-2xl shadow-xl flex items-center justify-between border border-indigo-800">
+            <div className="flex items-center gap-4 ml-2">
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-70">Активный выбор</span>
+              <div className="flex gap-3">
+                {selectedFileNames.size > 0 && <span className="text-xs font-bold">Файлов: {selectedFileNames.size}</span>}
+                {selectedItemIds.size > 0 && <span className="text-xs font-bold">Элементов: {selectedItemIds.size}</span>}
+              </div>
+            </div>
+            <button 
+              onClick={handleClearSelection}
+              className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl text-xs font-bold transition-all"
+            >
+              <X className="w-4 h-4" />
+              Сбросить выбор
+            </button>
+          </div>
+        </div>
+      )}
+
       {uploadedFiles.length > 0 && (
-        <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm transition-all">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-bold flex items-center gap-2"><FileStack className="w-5 h-5 text-indigo-600" /> Файлы</h2>
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <FileStack className="w-5 h-5 text-indigo-600" /> 
+              Файлы
+            </h2>
             {selectedFileNames.size > 0 && (
-              <button onClick={handleDeleteFiles} disabled={deleting} className="bg-red-50 text-red-600 px-4 py-2 rounded-xl text-xs font-bold border border-red-100 hover:bg-red-100 flex items-center gap-2">
-                {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Удалить файлы ({selectedFileNames.size})
+              <button 
+                onClick={handleDeleteFiles} 
+                disabled={deleting} 
+                className="bg-red-50 text-red-600 px-4 py-2 rounded-xl text-xs font-bold border border-red-100 hover:bg-red-100 flex items-center gap-2 transition-all active:scale-95"
+              >
+                {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} 
+                Удалить выбранное ({selectedFileNames.size})
               </button>
             )}
           </div>
           <div className="space-y-2">
             {uploadedFiles.map(file => (
-              <div key={file.name} onClick={() => toggleFileSelect(file.name)} className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all ${selectedFileNames.has(file.name) ? 'border-indigo-600 bg-indigo-50' : 'border-slate-100 bg-slate-50'}`}>
+              <div 
+                key={file.name} 
+                onClick={() => toggleFileSelect(file.name)} 
+                className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all ${selectedFileNames.has(file.name) ? 'border-indigo-600 bg-indigo-50 shadow-sm' : 'border-slate-100 bg-slate-50 hover:bg-slate-100'}`}
+              >
                 <div className="flex items-center gap-3">
                   {selectedFileNames.has(file.name) ? <CheckSquare className="text-indigo-600 w-5 h-5" /> : <Square className="text-slate-300 w-5 h-5" />}
-                  <div><p className="text-sm font-bold">{file.name}</p><p className="text-[10px] text-slate-400 uppercase font-black">{file.count} поз.</p></div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">{file.name}</p>
+                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-tighter">
+                      {file.date} • {file.count} поз.
+                    </p>
+                  </div>
                 </div>
               </div>
             ))}
@@ -155,19 +206,37 @@ export const NomenclatureImport: React.FC<NomenclatureImportProps> = ({ catalog,
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-bold">Справочник ({catalog.length})</h2>
             {selectedItemIds.size > 0 && (
-              <button onClick={handleDeleteItems} disabled={deleting} className="bg-red-50 text-red-600 px-4 py-2 rounded-xl text-xs font-bold border border-red-100 hover:bg-red-100 flex items-center gap-2">
-                {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} Удалить ({selectedItemIds.size})
+              <button 
+                onClick={handleDeleteItems} 
+                disabled={deleting} 
+                className="bg-red-50 text-red-600 px-4 py-2 rounded-xl text-xs font-bold border border-red-100 hover:bg-red-100 flex items-center gap-2 transition-all active:scale-95"
+              >
+                {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} 
+                Удалить выбранное ({selectedItemIds.size})
               </button>
             )}
           </div>
-          <div className="max-h-96 overflow-y-auto rounded-xl border border-slate-100">
+          <div className="max-h-96 overflow-y-auto rounded-xl border border-slate-100 shadow-inner">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 sticky top-0"><tr><th className="p-3"></th><th className="p-3 text-[10px] uppercase font-black text-slate-400">Наименование</th></tr></thead>
-              <tbody className="divide-y">
+              <thead className="bg-slate-50 sticky top-0 z-10 border-b">
+                <tr>
+                  <th className="p-3 w-10"></th>
+                  <th className="p-3 text-[10px] uppercase font-black text-slate-400 tracking-widest">Категория</th>
+                  <th className="p-3 text-[10px] uppercase font-black text-slate-400 tracking-widest">Наименование</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
                 {catalog.map(item => (
-                  <tr key={item.id} onClick={() => toggleItemSelect(item.id)} className={`cursor-pointer transition-colors ${selectedItemIds.has(item.id) ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}>
-                    <td className="p-3">{selectedItemIds.has(item.id) ? <CheckSquare className="w-4 h-4 text-indigo-600" /> : <Square className="w-4 h-4 text-slate-200" />}</td>
-                    <td className="p-3 font-medium text-slate-800">{item.name}</td>
+                  <tr 
+                    key={item.id} 
+                    onClick={() => toggleItemSelect(item.id)} 
+                    className={`cursor-pointer transition-colors ${selectedItemIds.has(item.id) ? 'bg-indigo-50/50' : 'hover:bg-slate-50/50'}`}
+                  >
+                    <td className="p-3">
+                      {selectedItemIds.has(item.id) ? <CheckSquare className="w-4 h-4 text-indigo-600" /> : <Square className="w-4 h-4 text-slate-200" />}
+                    </td>
+                    <td className="p-3 font-bold text-indigo-700 text-xs">{item.category}</td>
+                    <td className="p-3 font-medium text-slate-800 text-xs">{item.name}</td>
                   </tr>
                 ))}
               </tbody>
